@@ -11,11 +11,7 @@ struct {
 } term;
 
 typedef struct {
-	int x;
-
-	struct {
-		int top, bottom;	
-	} edges;
+	int top, bottom;	
 } opening_t;
 
 struct {
@@ -25,7 +21,9 @@ struct {
 	} player;
 	
 	struct {
-		
+		opening_t gaps[512];	
+		int gap_size;
+		int x;
 	} world;
 
 	int paused;
@@ -33,6 +31,7 @@ struct {
 	.player = { 1, 3 },
 };
 
+struct termios oldt;
 
 void sig_winch_hndlr(int sig)
 {
@@ -45,7 +44,11 @@ void sig_winch_hndlr(int sig)
 }
 
 
-void sig_int_hndlr(int sig)   { endwin(); exit(0); }
+void sig_int_hndlr(int sig)
+{
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+	exit(1);
+}
 
 
 void input_hndlr()
@@ -80,13 +83,26 @@ void input_hndlr()
 }
 
 
-char sampler(int row, int col)
+static inline char sampler(int row, int col)
 {
 	if (row == game.player.y)
 	if (col == game.player.x)
 		return '>';
 
+	opening_t* gap = game.world.gaps + ((col + game.world.x) % term.max_cols);
+	
+	if (row < gap->top || row > gap->bottom)
+		return 'X';
+
 	return ' ';
+}
+
+
+static inline int is_dead()
+{
+	int x = game.player.x + game.world.x;
+	opening_t* gap = game.world.gaps + (x % term.max_cols);
+	return game.player.y < gap->top || game.player.y > gap->bottom; 
 }
 
 
@@ -105,10 +121,22 @@ void rasterize()
 		fputc(glyph, stderr);
 	} fputc('\n', stderr);
 
-	fprintf(stderr, "%s", move_up);
+	if (!is_dead()) fprintf(stderr, "%s", move_up);
 }
 
 
+void next_gap(opening_t* next, opening_t* last)
+{
+	int delta = (random() % 3) - 1;
+
+	int top = last->top + delta;
+
+	if (top > 8) top = 8;
+	if (top < 0) top = 0; 
+
+	next->top = top;
+	next->bottom = top + game.world.gap_size;
+}
 
 
 void update()
@@ -123,6 +151,14 @@ void update()
 	{
 		game.player.y += dy;
 	}
+
+	game.world.x++;
+
+	opening_t* last = game.world.gaps + ((game.world.x + term.max_cols - 2) % term.max_cols);
+	opening_t* next = game.world.gaps + ((game.world.x - 1) % term.max_cols);
+
+	next_gap(next, last);
+
 }
 
 
@@ -130,9 +166,12 @@ int main(int argc, char* argv[])
 {
 
 	signal(SIGWINCH, sig_winch_hndlr);
+	signal(SIGINT, sig_int_hndlr);
 	sig_winch_hndlr(0);
 
-	struct termios oldt;
+	printf("Controls:\n\ti - move up\n\tj - move down\n");
+	sleep(3);
+
 	tcgetattr(STDIN_FILENO, &oldt);
 	struct termios newt = oldt;
 	newt.c_lflag &= ~ECHO;
@@ -141,14 +180,31 @@ int main(int argc, char* argv[])
 
 	fputs("\033[?25l", stderr);
 
-	int i = 0;
-	while (!game.paused)
+	game.world.gap_size = 9;
+	int top = 0; //(random() % 9) - game.world.gap_size;
+	
+	game.world.gaps[0].top = 0;
+	game.world.gaps[0].bottom = 8;
+	opening_t* last = game.world.gaps;
+
+	for (int i = 1; i < term.max_cols; ++i)
 	{
-		// TODO: write a game
+		if (game.world.gap_size > 3) { game.world.gap_size--; }
+
+		next_gap(game.world.gaps + i, last);
+		last = game.world.gaps + i;
+	}
+
+	while (!is_dead())
+	{
 		input_hndlr();
 		update();
 		rasterize();
 	}
 
-	return 0;
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+	fputs("\033[?25h", stderr);
+	printf("\nSCORE: %d\n", game.world.x);
+
+	return 1;
 }
