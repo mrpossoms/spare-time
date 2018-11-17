@@ -83,18 +83,18 @@ void input_hndlr()
 }
 
 
-static inline char sampler(int row, int col)
+static inline char* sampler(int row, int col)
 {
 	if (row == game.player.y)
 	if (col == game.player.x)
-		return '>';
+		return "\033[0;32m>\033[91m";
 
 	opening_t* gap = game.world.gaps + ((col + game.world.x) % term.max_cols);
 	
 	if (row < gap->top || row > gap->bottom)
-		return 'X';
+		return "X";
 
-	return ' ';
+	return " ";
 }
 
 
@@ -114,12 +114,14 @@ void rasterize()
 	
 
 	// line
+	fprintf(stderr, "\033[91m");
 	for (int r = 0; r < rows; ++r)
 	for (int c = 0; c < term.max_cols; ++c)
 	{
-		char glyph = sampler(r, c);
-		fputc(glyph, stderr);
+		char* glyph = sampler(r, c);
+		fprintf(stderr, "%s", glyph);
 	} fputc('\n', stderr);
+	fprintf(stderr, "\033[39m");
 
 	if (!is_dead()) fprintf(stderr, "%s", move_up);
 }
