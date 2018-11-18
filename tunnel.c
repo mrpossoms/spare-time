@@ -17,7 +17,7 @@ typedef struct {
 struct {
 	struct {
 		int x, y;
-		int dy;
+		int dx, dy;
 	} player;
 	
 	struct {
@@ -64,6 +64,7 @@ void input_hndlr()
 		case 0:  // timeout
 		case -1: // error
 			game.player.dy = 0;
+			game.player.dx = 0;
 			return;
 	}
 
@@ -76,6 +77,12 @@ void input_hndlr()
 			break;
 		case 'k':
 			game.player.dy = 1;
+			break;
+		case 'j':
+			game.player.dx = -1;
+			break;
+		case 'l':
+			game.player.dx = 1;
 			break;
 		default:
 			game.player.dy = 0;
@@ -140,10 +147,12 @@ void next_gap(opening_t* next, opening_t* last)
 	next->bottom = top + game.world.gap_size;
 }
 
-
+#define CLAMP(x, min, max) (x > max ? max : (x < min ? min : x))
 void update()
 {
 	int dy = game.player.dy;	
+	int dx = game.player.dx;	
+	/*
 	if ( game.player.y > 0 && dy < 0)
 	{
 		game.player.y += dy;
@@ -153,6 +162,12 @@ void update()
 	{
 		game.player.y += dy;
 	}
+	*/
+	game.player.x += dx;
+	game.player.y += dy;
+	
+	game.player.x = CLAMP(game.player.x, 0, term.max_cols);
+	game.player.y = CLAMP(game.player.y, 0, 8);
 
 	game.world.x++;
 
@@ -171,7 +186,7 @@ int main(int argc, char* argv[])
 	signal(SIGINT, sig_int_hndlr);
 	sig_winch_hndlr(0);
 
-	printf("Controls:\n\ti - move up\n\tj - move down\n");
+	printf("Controls:\n\ti & k - move up and down\n\tj & l - move left and right\n");
 	sleep(3);
 
 	tcgetattr(STDIN_FILENO, &oldt);
