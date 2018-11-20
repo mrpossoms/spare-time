@@ -107,28 +107,6 @@ static inline int is_dead()
 }
 
 
-void rasterize()
-{
-	int rows = term.max_rows;
-	static char move_up[16] = {};
-	sprintf(move_up, "\033[%dA", rows);
-	
-
-	// line
-	//fprintf(stderr, "\033[91m");
-	for (int r = 0; r < rows; ++r)
-	for (int c = 0; c < term.max_cols; ++c)
-	{
-		char* glyph = sampler(r, c);
-		fprintf(stderr, "%s", glyph);
-	} fputc('\n', stderr);
-
-	//fprintf(stderr, "\033[39m");
-
-	if (!is_dead()) fprintf(stderr, "%s", move_up);
-}
-
-
 void next_gap(opening_t* next, opening_t* last)
 {
 	int delta = (random() % 3) - 1;
@@ -217,7 +195,7 @@ int main(int argc, char* argv[])
 	{
 		input_hndlr();
 		update();
-		rasterize();
+		tg_rasterize(term.max_rows, term.max_cols, sampler);
 	}
 
 	tg_restore_settings(&oldt);

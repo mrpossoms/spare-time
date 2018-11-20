@@ -59,4 +59,26 @@ int tg_key_get(char* key)
 	return read(STDIN_FILENO, key, sizeof(char)) == sizeof(char);
 }
 
+
+void tg_rasterize(int rows, int cols, char* (*sampler)(int row, int col))
+{
+	static char move_up[16] = {};
+	sprintf(move_up, "\033[%dA", rows);
+	
+
+	// line
+	//fprintf(stderr, "\033[91m");
+	for (int r = 0; r < rows; ++r)
+	for (int c = 0; c < cols; ++c)
+	{
+		char* glyph = sampler(r, c);
+		fprintf(stderr, "%s", glyph);
+	} fputc('\n', stderr);
+
+	//fprintf(stderr, "\033[39m");
+
+	//if (!is_dead())
+	fprintf(stderr, "%s", move_up);
+}
+
 #endif
