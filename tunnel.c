@@ -7,7 +7,7 @@
 #include <time.h>
 #include <math.h>
 
-#include "term_game.h"
+#include "tg.h"
 
 struct {
 	int max_rows, max_cols;
@@ -164,7 +164,6 @@ int main(int argc, char* argv[])
 
 	printf("Controls:\n\ti & k - move up and down\n\tj & l - move left and right\nStarting in ");
 	
-	//if(0)
 	for(int i = 3; i--;)
 	{
 		printf("%d ", i + 1);

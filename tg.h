@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <termios.h>
 #include <term.h>
+#include <stdarg.h>
+#include <string.h>
 
 int tg_game_settings(struct termios* old_settings)
 {
@@ -43,8 +45,9 @@ int tg_term_width()
 
 int tg_key_get(char* key)
 {
+	const int timeout = 10000;
 	fd_set fds;
-	struct timeval tv = { 0, 100000 };
+	struct timeval tv = { 0, timeout };
 
 	FD_ZERO(&fds);
 	FD_SET(STDIN_FILENO, &fds);
@@ -56,7 +59,44 @@ int tg_key_get(char* key)
 			return 0;
 	}
 
+	usleep(tv.tv_usec); // wait the remaining timeout
+
 	return read(STDIN_FILENO, key, sizeof(char)) == sizeof(char);
+}
+
+
+typedef struct {
+	int row;
+	int col;
+	const char* fmt;
+	struct {
+		uint8_t centered : 1;
+	} mode;
+
+	char   _buf[1024];
+	size_t _len;
+} tg_str_t;
+
+
+int tg_str(int row, int col, tg_str_t* ctx, ...)
+{
+	va_list ap;
+
+	va_start(ap, ctx);
+	vsnprintf(ctx->_buf, sizeof(ctx->_buf), ctx->fmt, ap);
+	va_end(ap);
+
+	ctx->_len = strlen(ctx->_buf); 
+
+	if (row == ctx->row) { return -1; }
+
+	if (col >= ctx->col && col < ctx->col + ctx->_len)
+	{
+		int i = col - ctx->col;
+		return ctx->_buf[i];
+	}
+
+	return -1;
 }
 
 

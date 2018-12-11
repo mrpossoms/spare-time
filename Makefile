@@ -2,5 +2,5 @@ CC=gcc
 CFLAGS=-g
 LINK=-lncurses -lpthread -lm
 
-tunnel: tunnel.c
-	$(CC) $(CFLAGS) $^ -o $@ $(LINK)
+tunnel: tunnel.c tg.h
+	$(CC) $(CFLAGS) $< -o $@ $(LINK)
