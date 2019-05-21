@@ -9,10 +9,12 @@
 
 #include "tg.h"
 
-#define CRAFT_W 8
-#define CRAFT_H 8
+#define CRAFT_W 32
+#define CRAFT_H 32
 
 int TG_TIMEOUT = 100;
+
+uint8_t rand_tbl[512];
 
 struct {
 	int max_rows, max_cols;
@@ -30,10 +32,12 @@ struct termios oldt;
 
 craft_t craft = {
 	.parts = {
-		"#-[]-#",
+		"    /:\\    ",
+		"###-[^]-###",
 	},
-	.pos = { 40, 2 },
+	.pos = { 0, 0 },
 };
+
 
 void compute_origin(craft_t* c)
 {
@@ -41,10 +45,12 @@ void compute_origin(craft_t* c)
 
 	c->origin.x = c->origin.y = 0;
 
-	for (int i = CRAFT_W; --i;)
-	for (int j = CRAFT_H; --j;)
+	for (int i = 0; i < CRAFT_W; ++i)
+	for (int j = 0; j < CRAFT_H; ++j)
 	{
-		if (c->parts[j][j] == '\0') { continue; }
+		char part = c->parts[j][i];
+		if (part == ' ') { continue; }
+		if (part == '\0') { break; }
 
 		c->origin.x += i;
 		c->origin.y += j;
@@ -55,14 +61,19 @@ void compute_origin(craft_t* c)
 	c->origin.y /= part_count;
 }
 
+
 char sample_craft(craft_t const* c, int row, int col)
 {
-	int c_col = (col - (int)c->pos.x) - c->origin.x;
-	int c_row = (row - (int)c->pos.y) - c->origin.y; 
+	int c_col = (col - (int)c->pos.x) + c->origin.x;
+	int c_row = (row - (int)c->pos.y) + c->origin.y;
 
 	if (c_col < 0 || c_row < 0 || c_col >= CRAFT_W || c_row >= CRAFT_H) return '\0';
 
-	return c->parts[c_row][c_col];
+	char part = c->parts[c_row][c_col];
+
+	if (part == ' ') { return '\0'; }
+
+	return part;
 }
 
 
@@ -76,6 +87,8 @@ void update_craft(craft_t* c)
 void sig_winch_hndlr(int sig)
 {
 	term.max_cols = tg_term_width();
+	term.max_rows = tg_term_height() - 1;
+
 	if (term.max_cols < 0)
 	{
 		term.max_cols = 80;
@@ -125,8 +138,22 @@ static inline char* sampler(int row, int col)
 {
 	// return character for a given row and column in the terminal
 	static char c;
+
+	{ // draw velocity string
+		tg_str_t vel_str = {
+			1, 1,
+			"V: %0.2f, %0.2f",
+		};
+
+		c = tg_str(row, col, &vel_str, craft.vel.x, craft.vel.y);
+		if (c > -1) return &c;
+	}
+
 	c = sample_craft(&craft, row, col);
 	if (c != '\0') { return &c; }
+
+	// render stars
+	if (rand_tbl[((row * term.max_cols) + col) % 512] < 4) { return "*"; }
 
 	return " ";
 }
@@ -148,13 +175,15 @@ void update()
 
 int main(int argc, char* argv[])
 {
-
+	srandom(time(NULL));
 	signal(SIGWINCH, sig_winch_hndlr);
 	signal(SIGINT, sig_int_hndlr);
 	sig_winch_hndlr(0);
 
-	tg_game_settings(&oldt);
+	for (int i = sizeof(rand_tbl); i--;) { rand_tbl[i] = random() % 256; }
 
+	tg_game_settings(&oldt);
+	compute_origin(&craft);
 
 	while (playing())
 	{

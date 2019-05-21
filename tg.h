@@ -11,6 +11,7 @@
 
 extern int TG_TIMEOUT;
 
+
 int tg_game_settings(struct termios* old_settings)
 {
 	struct termios newt;
@@ -28,6 +29,7 @@ int tg_game_settings(struct termios* old_settings)
 	return 0;
 }
 
+
 int tg_restore_settings(struct termios* old_settings)
 {
 	tcsetattr(STDIN_FILENO, TCSANOW, old_settings);
@@ -35,6 +37,7 @@ int tg_restore_settings(struct termios* old_settings)
 
 	return 0;
 }
+
 
 int tg_term_width()
 {
@@ -46,6 +49,19 @@ int tg_term_width()
 
 	return -1;
 }
+
+
+int tg_term_height()
+{
+	char buf[2048];
+	if (tgetent(buf, getenv("TERM")) >= 0)
+	{
+		return tgetnum("li");
+	}
+
+	return -1;
+}
+
 
 int tg_key_get(char* key)
 {
@@ -91,9 +107,9 @@ int tg_str(int row, int col, tg_str_t* ctx, ...)
 	vsnprintf(ctx->_buf, sizeof(ctx->_buf), ctx->fmt, ap);
 	va_end(ap);
 
-	ctx->_len = strlen(ctx->_buf); 
+	ctx->_len = strlen(ctx->_buf);
 
-	if (row == ctx->row) { return -1; }
+	if (row != ctx->row) { return -1; }
 
 	if (col >= ctx->col && col < ctx->col + ctx->_len)
 	{
@@ -109,7 +125,7 @@ void tg_rasterize(int rows, int cols, char* (*sampler)(int row, int col))
 {
 	static char move_up[16] = {};
 	sprintf(move_up, "\033[%dA", rows);
-	
+
 
 	// line
 	//fprintf(stderr, "\033[91m");
