@@ -6,6 +6,10 @@
 #include <term.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+extern int TG_TIMEOUT;
 
 int tg_game_settings(struct termios* old_settings)
 {
@@ -45,12 +49,13 @@ int tg_term_width()
 
 int tg_key_get(char* key)
 {
-	const int timeout = 10000;
 	fd_set fds;
-	struct timeval tv = { 0, timeout };
+	struct timeval tv = { 0, TG_TIMEOUT };
 
 	FD_ZERO(&fds);
 	FD_SET(STDIN_FILENO, &fds);
+
+	fpurge(stdin);
 
 	switch(select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv))
 	{

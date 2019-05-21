@@ -9,6 +9,8 @@
 
 #include "tg.h"
 
+int TG_TIMEOUT = 100000;
+
 struct {
 	int max_rows, max_cols;
 } term = { 18, 0 };
