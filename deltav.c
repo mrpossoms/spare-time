@@ -12,7 +12,7 @@
 #define CRAFT_W 32
 #define CRAFT_H 32
 
-int TG_TIMEOUT = 100;
+int TG_TIMEOUT = 10;
 
 uint8_t rand_tbl[512];
 
@@ -36,6 +36,17 @@ craft_t craft = {
 		"###-[^]-###",
 	},
 	.pos = { 0, 0 },
+};
+
+craft_t station = {
+	.parts = {
+		"## ##   _   ## ##",
+		"## ##  |.|  ## ##",
+		"##-##==[:]==##-##",
+		"## ##  |.|  ## ##",
+		"## ##   V   ## ##",
+	},
+	.pos = { 40, 20 },
 };
 
 
@@ -116,15 +127,19 @@ void input_hndlr()
 	switch(c)
 	{ // handle key accordingly
                 case 'i':
+		case 'w':
                         craft.vel.y -= imp;
                         break;
                 case 'k':
+		case 's':
                         craft.vel.y += imp;
                         break;
                 case 'j':
+		case 'a':
                         craft.vel.x -= imp;
                         break;
                 case 'l':
+		case 'd':
                         craft.vel.x += imp;
                         break;
 		default:
@@ -150,6 +165,9 @@ static inline char* sampler(int row, int col)
 	}
 
 	c = sample_craft(&craft, row, col);
+	if (c != '\0') { return &c; }
+	
+	c = sample_craft(&station, row, col);
 	if (c != '\0') { return &c; }
 
 	// render stars
@@ -184,6 +202,7 @@ int main(int argc, char* argv[])
 
 	tg_game_settings(&oldt);
 	compute_origin(&craft);
+	compute_origin(&station);
 
 	while (playing())
 	{

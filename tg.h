@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <stdlib.h>
 
 extern int TG_TIMEOUT;
@@ -71,7 +72,7 @@ int tg_key_get(char* key)
 	FD_ZERO(&fds);
 	FD_SET(STDIN_FILENO, &fds);
 
-	fpurge(stdin);
+	__fpurge(stdin);
 
 	switch(select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv))
 	{
