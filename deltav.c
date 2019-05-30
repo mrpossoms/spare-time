@@ -125,6 +125,8 @@ void input_hndlr()
 		return;
 	}
 
+	if (craft.fuel == 0) { return; }
+
 	float imp = 0.01f;
 	switch(c)
 	{ // handle key accordingly
