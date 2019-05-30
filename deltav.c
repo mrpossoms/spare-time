@@ -26,6 +26,7 @@ typedef struct {
 
 	struct { float x, y; } pos;
 	struct { float x, y; } vel;
+	uint8_t fuel;
 } craft_t;
 
 struct termios oldt;
@@ -36,6 +37,7 @@ craft_t craft = {
 		"###-[^]-###",
 	},
 	.pos = { 0, 0 },
+	.fuel = 100,
 };
 
 craft_t station = {
@@ -128,18 +130,22 @@ void input_hndlr()
 	{ // handle key accordingly
                 case 'i':
 		case 'w':
+			craft.fuel--;
                         craft.vel.y -= imp;
                         break;
                 case 'k':
 		case 's':
+			craft.fuel--;
                         craft.vel.y += imp;
                         break;
                 case 'j':
 		case 'a':
+			craft.fuel--;
                         craft.vel.x -= imp;
                         break;
                 case 'l':
 		case 'd':
+			craft.fuel--;
                         craft.vel.x += imp;
                         break;
 		default:
@@ -164,6 +170,19 @@ static inline char* sampler(int row, int col)
 		if (c > -1) return &c;
 	}
 
+	{ // draw fuel gauge
+		char str[32] = "Fuel: [          ]";
+		for (int i = craft.fuel / 10; i--;) { str[7 + i] = '#'; }
+
+		tg_str_t fuel_str = {
+			2, 1,
+			str,	
+		};
+
+		c = tg_str(row, col, &fuel_str);
+		if (c > -1) return &c;
+	}
+
 	c = sample_craft(&craft, row, col);
 	if (c != '\0') { return &c; }
 	
@@ -183,6 +202,16 @@ int playing()
 	return 1;
 }
 
+void start()
+{
+	station.pos.x = term.max_cols / 2;
+	station.pos.y = 5;
+
+	craft.pos.x = (random() % (term.max_cols / 2)) + term.max_cols / 4;
+	craft.pos.y = term.max_rows - 5;
+	craft.vel.x = ((random() % 20) - 10) / 100.f;
+	craft.vel.y = ((random() % 20) - 10) / 100.f;
+}
 
 void update()
 {
@@ -203,6 +232,8 @@ int main(int argc, char* argv[])
 	tg_game_settings(&oldt);
 	compute_origin(&craft);
 	compute_origin(&station);
+
+	start();
 
 	while (playing())
 	{
