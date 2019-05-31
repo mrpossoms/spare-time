@@ -29,6 +29,23 @@ typedef struct {
 	uint8_t fuel;
 } craft_t;
 
+typedef struct {
+	struct { float x, y; } pos;
+	struct { float x, y; } vel;
+	int life;
+	char glyph;
+} particle_t;
+
+typedef struct {
+	particle_t particles[128];
+	int start_life;
+	float repulsion;
+	char density_glyphs[10];
+
+	size_t _glyph_count;
+	int _living_count;
+} particle_system_t;
+
 struct termios oldt;
 
 craft_t craft = {
@@ -51,6 +68,14 @@ craft_t station = {
 	.pos = { 40, 20 },
 };
 
+particle_system_t thruster_psys = {
+	.start_life = 10,
+	.repulsion = 0.01f,
+	.density_glyphs = " .,:;x%&##"
+};
+
+
+float randf() { return (random() % 2048) / 1024.f - 1.f; }
 
 void compute_origin(craft_t* c)
 {
@@ -72,6 +97,91 @@ void compute_origin(craft_t* c)
 
 	c->origin.x /= part_count;
 	c->origin.y /= part_count;
+}
+
+
+char sample_particle_sys(particle_system_t const* sys, int row, int col)
+{
+	char c = 0;
+	int density = 0;
+
+	for (int i = sys->_living_count; i--;)
+	{
+		if ((int)sys->particles[i].pos.x == col &&
+		    (int)sys->particles[i].pos.y == row)
+		{
+			density++;
+			if (sys->particles[i].glyph > 0) { c = sys->particles[i].glyph; }
+		}
+	}
+
+	if (density && c == 0)
+	{
+		density = density >= sizeof(sys->density_glyphs) ? sizeof(sys->density_glyphs) - 1 : density;
+		c = sys->density_glyphs[density];
+	}
+
+	return c;
+}
+
+
+void spawn_particle(particle_system_t* sys, particle_t* p)
+{
+	if (sys->_living_count >= sizeof(sys->particles) / sizeof(particle_t)) { return; }
+
+	sys->particles[sys->_living_count] = *p;
+	sys->_living_count++;
+}
+
+
+void update_particle_sys(particle_system_t* sys)
+{
+	particle_t* parts = sys->particles;
+	if (sys->repulsion > 0)
+	for (int i = sys->_living_count; i--;)
+	for (int j = sys->_living_count; j--;)
+	{
+		if (i == j) continue;
+		float d_x = parts[j].pos.x - parts[i].pos.x;
+		float d_y = parts[j].pos.y - parts[i].pos.y;
+
+		float dist = 0.001f + sqrtf(d_x * d_x + d_y * d_y);
+
+		float rep_x = sys->repulsion * d_x / dist;
+		float rep_y = sys->repulsion * d_y / dist;
+
+		parts[i].vel.x += rep_x;
+		parts[i].vel.y += rep_y;
+	}
+
+	for (int i = sys->_living_count; i--;)
+	{
+		if (parts[i].life <= 0)
+		{
+			parts[i] = parts[sys->_living_count - 1];
+			sys->_living_count--;
+		}
+		else
+		{
+			parts[i].pos.x += parts[i].vel.x;
+			parts[i].pos.y += parts[i].vel.y;
+			parts[i].life--;
+		}
+	}
+}
+
+
+void spawn_thruster_jet(float x, float y, float dx, float dy)
+{
+	for (int i = 10; i--;)
+	{
+		particle_t part = {
+			.pos = { x + randf() * 0.5f, y + randf() * 0.5f },
+			.vel = { dx, dy },
+			.life = thruster_psys.start_life + (random() % 10),
+		};
+		spawn_particle(&thruster_psys, &part);
+	}
 }
 
 
@@ -134,21 +244,25 @@ void input_hndlr()
 		case 'w':
 			craft.fuel--;
                         craft.vel.y -= imp;
+			spawn_thruster_jet(craft.pos.x, craft.pos.y, 0, imp * 100);
                         break;
                 case 'k':
 		case 's':
 			craft.fuel--;
                         craft.vel.y += imp;
+			spawn_thruster_jet(craft.pos.x, craft.pos.y, 0, -imp * 100);
                         break;
                 case 'j':
 		case 'a':
 			craft.fuel--;
                         craft.vel.x -= imp;
+			spawn_thruster_jet(craft.pos.x, craft.pos.y, imp * 100, 0);
                         break;
                 case 'l':
 		case 'd':
 			craft.fuel--;
                         craft.vel.x += imp;
+			spawn_thruster_jet(craft.pos.x, craft.pos.y, -imp * 100, 0);
                         break;
 		default:
 			// TODO
@@ -185,6 +299,9 @@ static inline char* sampler(int row, int col)
 		if (c > -1) return &c;
 	}
 
+	c = sample_particle_sys(&thruster_psys, row, col);
+	if (c != '\0') { return &c; }
+
 	c = sample_craft(&craft, row, col);
 	if (c != '\0') { return &c; }
 	
@@ -212,13 +329,14 @@ void start()
 	craft.pos.x = (random() % (term.max_cols / 2)) + term.max_cols / 4;
 	craft.pos.y = term.max_rows - 5;
 	craft.vel.x = ((random() % 20) - 10) / 100.f;
-	craft.vel.y = ((random() % 20) - 10) / 100.f;
+	craft.vel.y = -((random() % 20)) / 100.f;
 }
 
 void update()
 {
 	// do game logic, update game state
 	update_craft(&craft);
+	update_particle_sys(&thruster_psys);
 }
 
 
