@@ -12,7 +12,7 @@
 #define CRAFT_W 32
 #define CRAFT_H 32
 
-int TG_TIMEOUT = 10;
+int TG_TIMEOUT = 1000;
 
 uint8_t rand_tbl[512];
 
@@ -64,10 +64,9 @@ craft_t station = {
 		"## ##  |.|  ## ##",
 		"##-##==[:]==##-##",
 		"## ##  |.|  ## ##",
-		"## ##   V   ## ##",
+		"## ##   :   ## ##",
 	},
 	.pos = { 40, 20 },
-	.vel = { 0, 0.05 },
 };
 
 particle_system_t thruster_psys = {
@@ -228,7 +227,7 @@ void player_thruster(float dx, float dy)
 }
 
 
-int do_craft_intersect(craft_t const* c0, craft_t const* c1)
+int do_craft_intersect(craft_t const* c0, craft_t const* c1, int check_docking)
 {
 	if (c0->is_dead || c1->is_dead) { return 0; }
 
@@ -240,11 +239,13 @@ int do_craft_intersect(craft_t const* c0, craft_t const* c1)
 		int c0_part_y = c0->pos.y - c0->origin.y + c0_r;
 
 		if (c0_part == ' ' || c0_part == '\0') { continue; }
+		if (check_docking && (c0_part != 'V' && c0_part != ':')) { continue; }
 
 		for (int c1_r = CRAFT_H; c1_r--;)
 		for (int c1_c = CRAFT_W; c1_c--;)
 		{
 			char c1_part = c1->parts[c1_r][c1_c];
+			if (check_docking && (c1_part != 'V' && c1_part != ':')) { continue; }
 			if (c1_part == ' ' || c1_part == '\0') { continue; }
 			else
 			{
@@ -301,7 +302,7 @@ void sig_winch_hndlr(int sig)
 void sig_int_hndlr(int sig)
 {
 	tg_restore_settings(&oldt);
-	exit(1);
+	exit(0);
 }
 
 
@@ -416,7 +417,22 @@ void update()
 	update_particle_sys(&thruster_psys);
 	update_particle_sys(&crash_psys);
 
-	if (do_craft_intersect(&craft, &station))
+	int docked = do_craft_intersect(&craft, &station, 1);
+	if (docked)
+	{
+		if (craft.vel.x < 0.01 && fabs(craft.vel.y) < 0.03)
+		{
+			craft.vel.y = 0;
+			craft.vel.x = 0;
+		}
+		else
+		{
+			craft.is_dead = station.is_dead = 1;
+			spawn_crash(&craft);
+			spawn_crash(&station);
+		}
+	}
+	else if (do_craft_intersect(&craft, &station, 0))
 	{
 		craft.is_dead = station.is_dead = 1;
 		spawn_crash(&craft);
