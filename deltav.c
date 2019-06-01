@@ -28,24 +28,9 @@ typedef struct {
 	struct { float x, y; } vel;
 	uint8_t fuel;
 	uint8_t is_dead;
+	uint8_t is_docked;
 } craft_t;
 
-typedef struct {
-	struct { float x, y; } pos;
-	struct { float x, y; } vel;
-	int life;
-	char glyph;
-} particle_t;
-
-typedef struct {
-	particle_t particles[128];
-	int start_life;
-	float repulsion;
-	char density_glyphs[10];
-
-	size_t _glyph_count;
-	int _living_count;
-} particle_system_t;
 
 struct termios oldt;
 
@@ -69,25 +54,27 @@ craft_t station = {
 	.pos = { 40, 20 },
 };
 
-particle_system_t thruster_psys = {
+tg_particle_system_t thruster_psys = {
 	.start_life = 10,
 	.repulsion = 0.0f,
 	.density_glyphs = " .,:;x%&##"
 };
 
-particle_system_t crash_psys = {
+tg_particle_system_t crash_psys = {
 	.repulsion = 0.5f,
 	.start_life = 10000,
 };
 
+struct {
+	time_t start_time;
+	craft_t* crafts[10];
+} game = {};
 
-float randf() { return (random() % 2048) / 1024.f - 1.f; }
+
 
 void compute_origin(craft_t* c)
 {
 	int part_count = 0;
-
-
 
 	c->origin.x = c->origin.y = 0;
 
@@ -108,40 +95,6 @@ void compute_origin(craft_t* c)
 }
 
 
-char sample_particle_sys(particle_system_t const* sys, int row, int col)
-{
-	char c = 0;
-	int density = 0;
-
-	for (int i = sys->_living_count; i--;)
-	{
-		if ((int)sys->particles[i].pos.x == col &&
-		    (int)sys->particles[i].pos.y == row)
-		{
-			density++;
-			if (sys->particles[i].glyph > 0) { c = sys->particles[i].glyph; }
-		}
-	}
-
-	if (density && c == 0)
-	{
-		density = density >= sizeof(sys->density_glyphs) ? sizeof(sys->density_glyphs) - 1 : density;
-		c = sys->density_glyphs[density];
-	}
-
-	return c;
-}
-
-
-void spawn_particle(particle_system_t* sys, particle_t* p)
-{
-	if (sys->_living_count >= sizeof(sys->particles) / sizeof(particle_t)) { return; }
-
-	sys->particles[sys->_living_count] = *p;
-	sys->_living_count++;
-}
-
-
 void spawn_crash(craft_t* c)
 {
 	for (int i = CRAFT_W; i--;)
@@ -152,53 +105,13 @@ void spawn_crash(craft_t* c)
 		if (part == ' ' || part == '\0') { continue; }
 		else
 		{
-			particle_t p = {
+			tg_particle_t p = {
 				.pos = { c->pos.x + i - c->origin.x, c->pos.y + j - c->origin.y },
-				.vel = { c->vel.x + randf() * 0.01f, c->vel.y + randf() * 0.01f },
+				.vel = { c->vel.x + tg_randf() * 0.01f, c->vel.y + tg_randf() * 0.01f },
 				.glyph = part,
 				.life = 100000,
 			};
-			spawn_particle(&crash_psys, &p);
-		}
-	}
-}
-
-
-void update_particle_sys(particle_system_t* sys)
-{
-	particle_t* parts = sys->particles;
-	if (sys->repulsion > 0)
-	for (int i = sys->_living_count; i--;)
-	for (int j = sys->_living_count; j--;)
-	{
-		if (i == j) continue;
-		float d_x = parts[i].pos.x - parts[j].pos.x;
-		float d_y = parts[i].pos.y - parts[j].pos.y;
-
-		float dist = sqrtf(d_x * d_x + d_y * d_y);
-
-		if (dist < 0.5f)
-		{
-		float rep_x = (parts[j].vel.x - parts[i].vel.x) * sys->repulsion;//sys->repulsion / (0.01 + d_x * d_x);
-		float rep_y = (parts[j].vel.y - parts[i].vel.y) * sys->repulsion;//sys->repulsion / (0.01 + d_y * d_y);
-
-		parts[i].vel.x += rep_x;
-		parts[i].vel.y += rep_y;
-		}
-	}
-
-	for (int i = sys->_living_count; i--;)
-	{
-		if (parts[i].life <= 0)
-		{
-			parts[i] = parts[sys->_living_count - 1];
-			sys->_living_count--;
-		}
-		else
-		{
-			parts[i].pos.x += parts[i].vel.x;
-			parts[i].pos.y += parts[i].vel.y;
-			parts[i].life--;
+			tg_spawn_particle(&crash_psys, &p);
 		}
 	}
 }
@@ -208,14 +121,15 @@ void spawn_thruster_jet(float x, float y, float dx, float dy)
 {
 	for (int i = 10; i--;)
 	{
-		particle_t part = {
-			.pos = { x + randf() * 0.5f, y + randf() * 0.5f },
+		tg_particle_t part = {
+			.pos = { x + tg_randf() * 0.5f, y + tg_randf() * 0.5f },
 			.vel = { dx, dy },
 			.life = thruster_psys.start_life + (random() % 10),
 		};
-		spawn_particle(&thruster_psys, &part);
+		tg_spawn_particle(&thruster_psys, &part);
 	}
 }
+
 
 void player_thruster(float dx, float dy)
 {
@@ -276,6 +190,12 @@ char sample_craft(craft_t const* c, int row, int col)
 	if (part == ' ') { return '\0'; }
 
 	return part;
+}
+
+
+int compute_score(craft_t* c)
+{
+	return c->fuel - (time(NULL) - game.start_time);
 }
 
 
@@ -350,13 +270,27 @@ static inline char* sampler(int row, int col)
 	// return character for a given row and column in the terminal
 	static char c;
 
+	if (craft.is_docked)
+	{ // draw summary 
+		tg_str_t score_str = {
+			1, term.max_cols >> 1,
+			"Docked! Score: %d",
+			.mode = { .centered = 1 },
+		};
+
+		time_t time_elapsed = time(NULL) - game.start_time;
+		c = tg_str(row, col, &score_str, compute_score(&craft));
+		if (c > -1) return &c;
+	}
+
 	{ // draw velocity string
 		tg_str_t vel_str = {
 			1, 1,
-			"V: %0.2f, %0.2f",
+			"V: %0.2f, %0.2f Time: %d",
 		};
 
-		c = tg_str(row, col, &vel_str, craft.vel.x, craft.vel.y);
+		time_t time_elapsed = time(NULL) - game.start_time;
+		c = tg_str(row, col, &vel_str, craft.vel.x, craft.vel.y, time_elapsed);
 		if (c > -1) return &c;
 	}
 
@@ -373,17 +307,17 @@ static inline char* sampler(int row, int col)
 		if (c > -1) return &c;
 	}
 
-	c = sample_particle_sys(&crash_psys, row, col);
+	c = tg_sample_particle_sys(&crash_psys, row, col);
 	if (c != '\0') { return &c; }
 
-	c = sample_particle_sys(&thruster_psys, row, col);
+	c = tg_sample_particle_sys(&thruster_psys, row, col);
 	if (c != '\0') { return &c; }
 
-	c = sample_craft(&craft, row, col);
-	if (c != '\0') { return &c; }
-	
-	c = sample_craft(&station, row, col);
-	if (c != '\0') { return &c; }
+	for (int i = 0; game.crafts[i]; ++i)
+	{
+		c = sample_craft(game.crafts[i], row, col);
+		if (c != '\0') { return &c; }
+	}	
 
 	// render stars
 	if (rand_tbl[((row * term.max_cols) + col) % 512] < 4) { return "*"; }
@@ -407,37 +341,53 @@ void start()
 	craft.pos.y = term.max_rows - 5;
 	craft.vel.x = ((random() % 20) - 10) / 100.f;
 	craft.vel.y = -((random() % 20)) / 100.f;
+	
+	time(&game.start_time);
+
+	game.crafts[0] = &craft;
+	game.crafts[1] = &station;
 }
 
 void update()
 {
 	// do game logic, update game state
-	update_craft(&craft);
-	update_craft(&station);
-	update_particle_sys(&thruster_psys);
-	update_particle_sys(&crash_psys);
+	for (int i = 0; game.crafts[i]; ++i)
+	{
+		update_craft(game.crafts[i]);
 
-	int docked = do_craft_intersect(&craft, &station, 1);
-	if (docked)
-	{
-		if (craft.vel.x < 0.01 && fabs(craft.vel.y) < 0.03)
+		for (int j = 0; game.crafts[j]; ++j)
 		{
-			craft.vel.y = 0;
-			craft.vel.x = 0;
-		}
-		else
-		{
-			craft.is_dead = station.is_dead = 1;
-			spawn_crash(&craft);
-			spawn_crash(&station);
+			if (i == j) { continue; }
+	
+			int docked = do_craft_intersect(game.crafts[i], game.crafts[j], 1);
+			if (docked)
+			{
+				if (game.crafts[i]->vel.x < 0.01 && fabs(game.crafts[i]->vel.y) < 0.03)
+				{
+					game.crafts[i]->vel.y = game.crafts[j]->vel.y;
+					game.crafts[i]->vel.x = game.crafts[j]->vel.x;
+					game.crafts[i]->is_docked = 1;
+					game.crafts[j]->is_docked = 1;
+				}
+				else
+				{
+					game.crafts[i]->is_dead = game.crafts[j]->is_dead = 1;
+					spawn_crash(game.crafts[i]);
+					spawn_crash(game.crafts[j]);
+				}
+			}
+			else if (do_craft_intersect(game.crafts[i], game.crafts[j], 0))
+			{
+				game.crafts[i]->is_dead = game.crafts[j]->is_dead = 1;
+				spawn_crash(game.crafts[i]);
+				spawn_crash(game.crafts[j]);
+			}
+		
 		}
 	}
-	else if (do_craft_intersect(&craft, &station, 0))
-	{
-		craft.is_dead = station.is_dead = 1;
-		spawn_crash(&craft);
-		spawn_crash(&station);
-	}
+	
+	tg_update_particle_sys(&thruster_psys);
+	tg_update_particle_sys(&crash_psys);	
 }
 
 
