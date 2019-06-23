@@ -249,19 +249,19 @@ void input_hndlr()
 	{ // handle key accordingly
                 case 'i':
 		case 'w':
-			player_thruster(0, imp);
+			player_thruster(0, -imp);
                         break;
                 case 'k':
 		case 's':
-			player_thruster(0, -imp);
+			player_thruster(0, imp);
                         break;
                 case 'j':
 		case 'a':
-			player_thruster(imp, 0);
+			player_thruster(-imp, 0);
                         break;
                 case 'l':
 		case 'd':
-			player_thruster(-imp, 0);
+			player_thruster(imp, 0);
                         break;
 		case 'b':
 			spawn_crash(&craft);
