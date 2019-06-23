@@ -107,6 +107,12 @@ void tg_spawn_particle(tg_particle_system_t* sys, tg_particle_t* p)
 }
 
 
+void tg_clear_particles(tg_particle_system_t* sys)
+{
+	sys->_living_count = 0;
+}
+
+
 int tg_game_settings(struct termios* old_settings)
 {
 	struct termios newt;
@@ -222,12 +228,16 @@ int tg_str(int row, int col, tg_str_t* ctx, ...)
 }
 
 
-void tg_rasterize(int rows, int cols, char* (*sampler)(int row, int col))
+void tg_clear(int rows)
 {
 	static char move_up[16] = {};
 	sprintf(move_up, "\033[%dA", rows);
+	fprintf(stderr, "%s", move_up);
+}
 
 
+void tg_rasterize(int rows, int cols, char* (*sampler)(int row, int col))
+{
 	// line
 	//fprintf(stderr, "\033[91m");
 	for (int r = 0; r < rows; ++r)
@@ -239,8 +249,6 @@ void tg_rasterize(int rows, int cols, char* (*sampler)(int row, int col))
 
 	//fprintf(stderr, "\033[39m");
 
-	//if (!is_dead())
-	fprintf(stderr, "%s", move_up);
 }
 
 #endif

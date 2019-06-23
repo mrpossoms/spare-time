@@ -66,10 +66,13 @@ tg_particle_system_t crash_psys = {
 };
 
 struct {
-	time_t start_time;
+	time_t start_time, end_time;
 	craft_t* crafts[10];
+	int count_down;
 } game = {};
 
+
+void start(void);
 
 
 void compute_origin(craft_t* c)
@@ -195,7 +198,13 @@ char sample_craft(craft_t const* c, int row, int col)
 
 int compute_score(craft_t* c)
 {
-	return c->fuel - (time(NULL) - game.start_time);
+	return c->fuel - (game.end_time - game.start_time);
+}
+
+
+float compute_fuel_cost(float dx, float dy)
+{
+	return dx / 0.1f + dy / 0.1f;	
 }
 
 
@@ -258,6 +267,9 @@ void input_hndlr()
 			spawn_crash(&craft);
 			craft.is_dead = 1;
 			break;
+		case 'r':
+			start();
+			break;
 		default:
 			// TODO
 			;
@@ -270,6 +282,18 @@ static inline char* sampler(int row, int col)
 	// return character for a given row and column in the terminal
 	static char c;
 
+	if (game.count_down > 0)
+	{ // draw the count down message
+		tg_str_t score_str = {
+			term.max_rows >> 1, term.max_cols >> 1,
+			"Starting in %d",
+			.mode = { .centered = 1 },
+		};
+
+		c = tg_str(row, col, &score_str, game.count_down);
+		if (c > -1) return &c;
+	}
+
 	if (craft.is_docked)
 	{ // draw summary 
 		tg_str_t score_str = {
@@ -278,7 +302,7 @@ static inline char* sampler(int row, int col)
 			.mode = { .centered = 1 },
 		};
 
-		time_t time_elapsed = time(NULL) - game.start_time;
+		time_t time_elapsed = game.end_time - game.start_time;
 		c = tg_str(row, col, &score_str, compute_score(&craft));
 		if (c > -1) return &c;
 	}
@@ -329,27 +353,42 @@ static inline char* sampler(int row, int col)
 int playing()
 {
 	// return 0 when the game loop should terminate
-	return 1;
+	return !craft.is_docked;
 }
 
 void start()
 {
 	station.pos.x = term.max_cols / 2;
 	station.pos.y = 5;
+	station.is_dead = 0;
+	station.is_docked = 0;
 
 	craft.pos.x = (random() % (term.max_cols / 2)) + term.max_cols / 4;
 	craft.pos.y = term.max_rows - 5;
 	craft.vel.x = ((random() % 20) - 10) / 100.f;
 	craft.vel.y = -((random() % 20)) / 100.f;
+	craft.is_dead = 0;
+	craft.is_docked = 0;
+	craft.fuel = 100;
 	
 	time(&game.start_time);
 
 	game.crafts[0] = &craft;
 	game.crafts[1] = &station;
+
+	game.count_down = 3;
+
+	tg_clear_particles(&crash_psys);
 }
 
 void update()
 {
+	if (game.count_down-- > 0)
+	{
+		sleep(1);
+		return;
+	}
+
 	// do game logic, update game state
 	for (int i = 0; game.crafts[i]; ++i)
 	{
@@ -382,7 +421,10 @@ void update()
 				spawn_crash(game.crafts[i]);
 				spawn_crash(game.crafts[j]);
 			}
-		
+			else
+			{
+				game.end_time = time(NULL);
+			}
 		}
 	}
 	
@@ -409,9 +451,13 @@ int main(int argc, char* argv[])
 	while (playing())
 	{
 		input_hndlr();
-		update();
+		tg_clear(term.max_rows);
 		tg_rasterize(term.max_rows, term.max_cols, sampler);
+		update();
 	}
+
+	tg_clear(term.max_rows);
+	tg_rasterize(term.max_rows, term.max_cols, sampler);
 
 	tg_restore_settings(&oldt);
 

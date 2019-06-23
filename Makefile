@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g
+CFLAGS=-g -O3
 LINK=-lncurses -lpthread -lm
 
 deltav: deltav.c tg.h

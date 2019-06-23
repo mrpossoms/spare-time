@@ -114,7 +114,7 @@ void next_gap(opening_t* next, opening_t* last)
 	int delta = (random() % 3) - 1;
 
 	int top = last->top + delta;
-	int gap = (fabsf(sin(game.world.x / 10.f)) + 1.f) * game.world.gap_size;
+	int gap = (fabs(sin(game.world.x / 10.f)) + 1.f) * game.world.gap_size;
 	int max_top = term.max_rows - gap;
 	if (top > max_top) top = max_top;
 	if (top < 0) top = 0; 
@@ -196,6 +196,7 @@ int main(int argc, char* argv[])
 	{
 		input_hndlr();
 		update();
+		tg_clear(term.max_rows);
 		tg_rasterize(term.max_rows, term.max_cols, sampler);
 	}
 
