@@ -12,7 +12,7 @@
 #define CRAFT_W 32
 #define CRAFT_H 32
 
-int TG_TIMEOUT = 1000;
+int TG_TIMEOUT = 33333;
 
 uint8_t rand_tbl[512];
 
@@ -34,6 +34,8 @@ typedef struct {
 
 struct termios oldt;
 
+int difficulty = 0;
+
 craft_t craft = {
 	.parts = {
 		"    /:\\    ",
@@ -43,16 +45,40 @@ craft_t craft = {
 	.fuel = 100,
 };
 
-craft_t station = {
-	.parts = {
-		"## ##   _   ## ##",
-		"## ##  |.|  ## ##",
-		"##-##==[:]==##-##",
-		"## ##  |.|  ## ##",
-		"## ##   :   ## ##",
+craft_t stations[3] = {
+	{
+		.parts = {
+			"#####   _   ## ##",
+			"  #    |.|    #  ",
+			"##-##==[:]==##-##",
+			"  #    |.|    #  ",
+			"#####  :::  #####",
+		},
+		.pos = { 40, 20 },
 	},
-	.pos = { 40, 20 },
+	{
+		.parts = {
+			"    ## ##  ## ##",
+			"   ## ## || ## ##",
+			"  ##-##==[]==##-##",
+			" ## ##   ||   ## ##",
+			"## ##    ::    ## ##",
+		},
+		.pos = { 40, 20 },
+	},
+	{
+		.parts = {
+			"## ##   _   ## ##",
+			"## ##  |.|  ## ##",
+			"##-##==[:]==##-##",
+			"## ##  |.|  ## ##",
+			"## ##   :   ## ##",
+		},
+		.pos = { 40, 20 },
+	}
 };
+
+craft_t* station = stations + 0;
 
 tg_particle_system_t thruster_psys = {
 	.start_life = 10,
@@ -202,9 +228,9 @@ int compute_score(craft_t* c)
 }
 
 
-float compute_fuel_cost(float dx, float dy)
+float compute_min_fuel(float dx, float dy)
 {
-	return dx / 0.1f + dy / 0.1f;	
+	return dx / 0.01f + dy / 0.01f;	
 }
 
 
@@ -284,6 +310,17 @@ static inline char* sampler(int row, int col)
 
 	if (game.count_down > 0)
 	{ // draw the count down message
+		tg_str_t controls_str = {
+			(term.max_rows >> 1) + 2, term.max_cols >> 1,
+			"(Accelerate using i, j, k, l)",
+			.mode = { .centered = 1 },
+		};
+		tg_str_t instructions_str = {
+			(term.max_rows >> 1) + 3, term.max_cols >> 1,
+			"(Approach at a velocity less than 0.3)",
+			.mode = { .centered = 1 },
+		};
+
 		tg_str_t score_str = {
 			term.max_rows >> 1, term.max_cols >> 1,
 			"Starting in %d",
@@ -292,6 +329,26 @@ static inline char* sampler(int row, int col)
 
 		c = tg_str(row, col, &score_str, game.count_down);
 		if (c > -1) return &c;
+
+		c = tg_str(row, col, &controls_str);
+		if (c > -1) return &c;
+
+		c = tg_str(row, col, &instructions_str);
+		if (c > -1) return &c;
+	}
+
+	if (craft.is_dead)
+	{ // draw crashed string
+		tg_str_t crash_str = {
+			term.max_rows >> 1, term.max_cols >> 1,
+			"YOU CRASHED! (ctrl-c to exit, 'r' to retry)",
+			.mode = { .centered = 1 },
+		};
+
+		time_t time_elapsed = game.end_time - game.start_time;
+		c = tg_str(row, col, &crash_str);
+		if (c > -1) return &c;
+	
 	}
 
 	if (craft.is_docked)
@@ -358,10 +415,10 @@ int playing()
 
 void start()
 {
-	station.pos.x = term.max_cols / 2;
-	station.pos.y = 5;
-	station.is_dead = 0;
-	station.is_docked = 0;
+	station->pos.x = term.max_cols / 2;
+	station->pos.y = 5;
+	station->is_dead = 0;
+	station->is_docked = 0;
 
 	craft.pos.x = (random() % (term.max_cols / 2)) + term.max_cols / 4;
 	craft.pos.y = term.max_rows - 5;
@@ -369,12 +426,12 @@ void start()
 	craft.vel.y = -((random() % 20)) / 100.f;
 	craft.is_dead = 0;
 	craft.is_docked = 0;
-	craft.fuel = 100;
+	craft.fuel = compute_min_fuel(craft.vel.x, craft.vel.y) * (3.f - difficulty);
 	
 	time(&game.start_time);
 
 	game.crafts[0] = &craft;
-	game.crafts[1] = &station;
+	game.crafts[1] = station;
 
 	game.count_down = 3;
 
@@ -440,11 +497,25 @@ int main(int argc, char* argv[])
 	signal(SIGINT, sig_int_hndlr);
 	sig_winch_hndlr(0);
 
+	if (argc > 1)
+	{
+		const char* difficulties[] = {
+			"easy", "medium", "hard"
+		};
+
+		for (int i = 3; i--;)
+		if (!strcmp(argv[1], difficulties[i]))
+		{
+			difficulty = i;
+			station = stations + i;
+		}
+	}
+
 	for (int i = sizeof(rand_tbl); i--;) { rand_tbl[i] = random() % 256; }
 
 	tg_game_settings(&oldt);
 	compute_origin(&craft);
-	compute_origin(&station);
+	compute_origin(station);
 
 	start();
 
