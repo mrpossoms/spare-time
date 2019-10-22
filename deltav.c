@@ -27,6 +27,7 @@ typedef struct {
 	struct { float x, y; } pos;
 	struct { float x, y; } vel;
 	uint8_t fuel;
+	uint8_t oxygen;
 	uint8_t is_dead;
 	uint8_t is_docked;
 } craft_t;
@@ -43,6 +44,7 @@ craft_t craft = {
 	},
 	.pos = { 0, 0 },
 	.fuel = 100,
+    .oxygen = 100,
 };
 
 craft_t stations[3] = {
@@ -377,7 +379,7 @@ static inline char* sampler(int row, int col)
 
 	{ // draw fuel gauge
 		char str[32] = "Fuel: [          ]";
-		for (int i = craft.fuel / 10; i--;) { str[7 + i] = '#'; }
+		for (int i = 0; i < craft.fuel / 10; ++i) { str[7 + i] = '#'; }
 
 		tg_str_t fuel_str = {
 			2, 1,
@@ -388,6 +390,18 @@ static inline char* sampler(int row, int col)
 		if (c > -1) return &c;
 	}
 
+    { // draw oxygen gauge
+		char str[32] = "O2:   [          ]";
+		for (int i = 0; i < craft.oxygen / 10; ++i) { str[7 + i] = '#'; }
+
+		tg_str_t fuel_str = {
+			3, 1,
+			str,	
+		};
+
+		c = tg_str(row, col, &fuel_str);
+		if (c > -1) return &c;
+	}
 	c = tg_sample_particle_sys(&crash_psys, row, col);
 	if (c != '\0') { return &c; }
 
@@ -426,7 +440,7 @@ void start()
 	craft.vel.y = -((random() % 20)) / 100.f;
 	craft.is_dead = 0;
 	craft.is_docked = 0;
-	craft.fuel = compute_min_fuel(craft.vel.x, craft.vel.y) * (3.f - difficulty);
+	//craft.fuel = compute_min_fuel(craft.vel.x, craft.vel.y) * (3.f - difficulty);
 	
 	time(&game.start_time);
 
@@ -468,6 +482,7 @@ void update()
 				else
 				{
 					game.crafts[i]->is_dead = game.crafts[j]->is_dead = 1;
+                    game.crafts[i].fuel = game.crafts[i].oxygen = 0;
 					spawn_crash(game.crafts[i]);
 					spawn_crash(game.crafts[j]);
 				}
