@@ -482,7 +482,7 @@ void update()
 				else
 				{
 					game.crafts[i]->is_dead = game.crafts[j]->is_dead = 1;
-                    game.crafts[i].fuel = game.crafts[i].oxygen = 0;
+					game.crafts[i]->fuel = game.crafts[i]->oxygen = 0;
 					spawn_crash(game.crafts[i]);
 					spawn_crash(game.crafts[j]);
 				}
