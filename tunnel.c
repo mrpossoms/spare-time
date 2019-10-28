@@ -159,7 +159,7 @@ void update()
 
 int main(int argc, char* argv[])
 {
-
+    srand(time(NULL));
 	signal(SIGWINCH, sig_winch_hndlr);
 	signal(SIGINT, sig_int_hndlr);
 	sig_winch_hndlr(0);
@@ -192,12 +192,13 @@ int main(int argc, char* argv[])
 
 	game.start_time = time(NULL);
 
-	while (!is_dead())
+	while (1)
 	{
 		input_hndlr();
 		update();
-		tg_clear(term.max_rows);
 		tg_rasterize(term.max_rows, term.max_cols, sampler);
+        if (is_dead()) { break; }
+		tg_clear(term.max_rows);
 	}
 
 	tg_restore_settings(&oldt);
