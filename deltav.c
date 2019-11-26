@@ -27,7 +27,7 @@ typedef struct {
 	struct { float x, y; } pos;
 	struct { float x, y; } vel;
 	uint8_t fuel;
-	uint8_t oxygen;
+	float   oxygen;
 	uint8_t is_dead;
 	uint8_t is_docked;
 } craft_t;
@@ -341,14 +341,26 @@ static inline char* sampler(int row, int col)
 
 	if (craft.is_dead)
 	{ // draw crashed string
-		tg_str_t crash_str = {
+		tg_str_t* str_ptr = NULL;
+		tg_str_t str = {
 			term.max_rows >> 1, term.max_cols >> 1,
-			"YOU CRASHED! (ctrl-c to exit, 'r' to retry)",
+			"",
 			.mode = { .centered = 1 },
 		};
 
+		if (craft.oxygen == 0)
+		{
+			static char suff_str[] = "YOU SUFFOCATED! (ctrl-c to exit, 'r' to retry)";
+			str.fmt = suff_str;
+		}
+		else
+		{
+			static char crash_str[] = "YOU CRASHED! (ctrl-c to exit, 'r' to retry)";
+			str.fmt = crash_str;
+		}
+
 		time_t time_elapsed = game.end_time - game.start_time;
-		c = tg_str(row, col, &crash_str);
+		c = tg_str(row, col, &str);
 		if (c > -1) return &c;
 	
 	}
@@ -458,6 +470,16 @@ void update()
 	{
 		sleep(1);
 		return;
+	}
+
+	if (craft.oxygen > 0)
+	{
+		craft.oxygen -= 0.1f;
+	}
+	else
+	{
+		craft.oxygen = 0;
+		craft.is_dead = 1;
 	}
 
 	// do game logic, update game state
