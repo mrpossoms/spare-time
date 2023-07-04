@@ -305,7 +305,7 @@ void input_hndlr()
 }
 
 
-static inline char* sampler(int row, int col)
+static inline const char* sampler(int row, int col)
 {
 	// return character for a given row and column in the terminal
 	static char c;

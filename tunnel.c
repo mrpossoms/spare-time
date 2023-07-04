@@ -86,7 +86,7 @@ void input_hndlr()
 }
 
 
-static inline char* sampler(int row, int col)
+static inline const char* sampler(int row, int col)
 {
 	if (row == game.player.y)
 	if (col == game.player.x)

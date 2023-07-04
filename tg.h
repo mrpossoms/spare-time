@@ -324,14 +324,16 @@ void tg_clear(int rows)
  * @param      sampler  The sampler function pointer, whose purpose is described
  *                      above
  */
-void tg_rasterize(int rows, int cols, char* (*sampler)(int row, int col))
+void tg_rasterize(int rows, int cols, const char* (*sampler)(int row, int col))
 {
 	for (int r = 0; r < rows; ++r)
-	for (int c = 0; c < cols; ++c)
 	{
-		char* glyph = sampler(r, c);
-		fprintf(stderr, "%s", glyph);
-	} fputc('\n', stderr);
+		for (int c = 0; c < cols; ++c)
+		{
+			const char* glyph = sampler(r, c);
+			fprintf(stderr, "%s", glyph);
+		} fputc('\n', stderr);
+	}
 }
 
 #endif
