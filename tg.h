@@ -25,7 +25,7 @@ typedef struct {
 	tg_particle_t particles[128];
 	int start_life;
 	float repulsion;
-	char density_glyphs[10];
+	char density_glyphs[16];
 
 	size_t _glyph_count;
 	int _living_count;
@@ -194,7 +194,7 @@ int tg_term_width()
 	char buf[2048];
 	if (tgetent(buf, getenv("TERM")) >= 0)
 	{
-		return tgetnum("co");
+		return tgetnum((char*)"co");
 	}
 
 	return -1;
@@ -210,7 +210,7 @@ int tg_term_height()
 	char buf[2048];
 	if (tgetent(buf, getenv("TERM")) >= 0)
 	{
-		return tgetnum("li");
+		return tgetnum((char*)"li");
 	}
 
 	return -1;

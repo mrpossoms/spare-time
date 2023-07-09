@@ -1,4 +1,3 @@
-CC=gcc
 CFLAGS=-g -O0
 LINK=-lncurses -lpthread -lm
 
